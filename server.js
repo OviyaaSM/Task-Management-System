@@ -9,10 +9,17 @@ app.use(cors());
 app.use(express.json());
 
 //connect to mongoDB
+const MONGO_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/taskmanager";
+
 mongoose
-.connect("mongodb://localhost:27017/taskmanager",{})
-.then(() => console.log("connected to MongoDB"))
-.catch((err) => console.log("cannot connect to mongodb:", err));
+  .connect(MONGO_URI)
+  .then(() => console.log("connected to MongoDB"))
+  .catch((err) => console.log("cannot connect to mongodb:", err));
+
+//health check endpoint
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', message: 'Task Management API is running' });
+});
 
 //define task schema and model
 const TaskSchema = new mongoose.Schema({
@@ -90,3 +97,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT,()=> {
     console.log(`server is running on port ${PORT}`);
 });
+
+module.exports = app;
