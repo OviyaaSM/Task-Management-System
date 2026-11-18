@@ -1,101 +1,197 @@
+const dns = require('dns');
+
+dns.setServers(['8.8.8.8', '1.1.1.1']);
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
 
-//middleware
-app.use(cors());
+// Middleware
+app.use(cors({
+  origin: [
+    'https://task-management-frontend-one-pi.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ],
+  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Content-Type']
+}));
+
 app.use(express.json());
 
-//connect to mongoDB
-const MONGO_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/taskmanager";
+// Connect to MongoDB and start server
+const PORT = process.env.PORT || 5000;
 
-mongoose
-  .connect(MONGO_URI)
-  .then(() => console.log("connected to MongoDB"))
-  .catch((err) => console.log("cannot connect to mongodb:", err));
+async function startServer() {
+  try {
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI environment variable is missing');
+    }
 
-//health check endpoint
-app.get('/', (req, res) => {
-    res.json({ status: 'ok', message: 'Task Management API is running' });
-});
+    await mongoose.connect(process.env.MONGODB_URI);
 
-//define task schema and model
-const TaskSchema = new mongoose.Schema({
+    console.log('MongoDB Atlas connected successfully');
+
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+
+  } catch (err) {
+    console.error('Server startup failed:', err.message);
+    process.exit(1);
+  }
+}
+
+startServer();
     title: {
-        type: String,
-        required : true
+      type: String,
+      required: true,
+      trim: true
     },
-    status : {
-        type: String,
-        enum: ['pending', 'in progress', 'completed'],
-        default : 'pending'
-    },
-},
-{timestamps: true}
+
+    status: {
+      type: String,
+      enum: ['pending', 'in progress', 'completed'],
+      default: 'pending'
+    }
+  },
+  {
+    timestamps: true
+  }
 );
 
+// Task Model
 const Task = mongoose.model('Task', TaskSchema);
 
-//routes
-//fetch
-app.get('/tasks',async(req,res)=>{
-    try{
-        const tasks = await Task.find();
-        res.json(tasks);
-    }
-    catch(err){
-        res.status(500).json({message:"couldnt fetch tasks"});
-    }
+// Health check
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'Task Management API is running'
+  });
 });
-//create new task
-app.post('/tasks', async(req, res)=>{
-    const {title, status} = req.body;
-    const task = new Task({title,status});
-    try{
-        const savedTask = await task.save();
-        res.status(201).json(savedTask);
-    }catch(err){
-        res.status(400).json({message:"couldnt create task"});
-    }
+
+// Fetch all tasks
+app.get('/tasks', async (req, res) => {
+  try {
+    const tasks = await Task.find().sort({ createdAt: -1 });
+    res.json(tasks);
+  } catch (err) {
+    console.error('Fetch error:', err.message);
+
+    res.status(500).json({
+      message: 'Could not fetch tasks'
+    });
+  }
 });
-//update task
-app.patch('/tasks/:id',async(req,res)=>{
+
+// Create a new task
+app.post('/tasks', async (req, res) => {
+  try {
+    const { title, status } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({
+        message: 'Task title is required'
+      });
+    }
+
+    const task = new Task({
+      title: title.trim(),
+      status: status || 'pending'
+    });
+
+    const savedTask = await task.save();
+
+    res.status(201).json(savedTask);
+  } catch (err) {
+    console.error('Create error:', err.message);
+
+    res.status(400).json({
+      message: 'Could not create task'
+    });
+  }
+});
+
+// Update task status
+app.patch('/tasks/:id', async (req, res) => {
+  try {
     const { status } = req.body;
-    try {
-        const updatedTask  = await Task.findByIdAndUpdate(
-            req.params.id,
-            { status },
-            { new: true, runValidators: true }
-        );
-        if(!updatedTask){
-            return res.status(404).json({ message:"Task not found." });
-        }
-        res.json(updatedTask); 
+
+    const updatedTask = await Task.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      {
+        new: true,
+        runValidators: true
+      }
+    );
+
+    if (!updatedTask) {
+      return res.status(404).json({
+        message: 'Task not found'
+      });
     }
-    catch(err){
-        res.status(400).json({message:"couldnt update task"});
-    }
-});
-//delete tasks
-app.delete('/tasks/:id',async(req,res)=>{
-    const {id} = req.params;
-    try{
-        const deletedTask = await Task.findByIdAndDelete(id);
-        if(!deletedTask){
-            return res.status(404).json({message:"task not found"});
-        }
-        res.json({message:"task deleted successfully"});
-    }catch(err){
-        res.status(400).json({message:"couldnt delete task"});
-    }
+
+    res.json(updatedTask);
+  } catch (err) {
+    console.error('Update error:', err.message);
+
+    res.status(400).json({
+      message: 'Could not update task'
+    });
+  }
 });
 
-//server configuration
+// Delete task
+app.delete('/tasks/:id', async (req, res) => {
+  try {
+    const deletedTask = await Task.findByIdAndDelete(
+      req.params.id
+    );
+
+    if (!deletedTask) {
+      return res.status(404).json({
+        message: 'Task not found'
+      });
+    }
+
+    res.json({
+      message: 'Task deleted successfully'
+    });
+  } catch (err) {
+    console.error('Delete error:', err.message);
+
+    res.status(400).json({
+      message: 'Could not delete task'
+    });
+  }
+});
+
+// Connect to MongoDB and start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT,()=> {
-    console.log(`server is running on port ${PORT}`);
-});
+// Connect to MongoDB and start server
+const PORT = process.env.PORT || 5000;
 
-module.exports = app;
+async function startServer() {
+  try {
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI environment variable is missing');
+    }
+
+    await mongoose.connect(process.env.MONGODB_URI);
+
+    console.log('MongoDB Atlas connected successfully');
+
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Server startup failed:', err.message);
+    process.exit(1);
+  }
+}
+
+startServer();
