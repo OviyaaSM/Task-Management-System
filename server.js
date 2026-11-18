@@ -1,3 +1,4 @@
+
 const dns = require('dns');
 
 dns.setServers(['8.8.8.8', '1.1.1.1']);
@@ -21,36 +22,14 @@ app.use(cors({
 
 app.use(express.json());
 
-// Connect to MongoDB and start server
-const PORT = process.env.PORT || 5000;
-
-async function startServer() {
-  try {
-    if (!process.env.MONGODB_URI) {
-      throw new Error('MONGODB_URI environment variable is missing');
-    }
-
-    await mongoose.connect(process.env.MONGODB_URI);
-
-    console.log('MongoDB Atlas connected successfully');
-
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-
-  } catch (err) {
-    console.error('Server startup failed:', err.message);
-    process.exit(1);
-  }
-}
-
-startServer();
+// Task Schema
+const TaskSchema = new mongoose.Schema(
+  {
     title: {
       type: String,
       required: true,
       trim: true
     },
-
     status: {
       type: String,
       enum: ['pending', 'in progress', 'completed'],
@@ -65,7 +44,7 @@ startServer();
 // Task Model
 const Task = mongoose.model('Task', TaskSchema);
 
-// Health check
+// Health Check
 app.get('/', (req, res) => {
   res.json({
     status: 'ok',
@@ -80,7 +59,6 @@ app.get('/tasks', async (req, res) => {
     res.json(tasks);
   } catch (err) {
     console.error('Fetch error:', err.message);
-
     res.status(500).json({
       message: 'Could not fetch tasks'
     });
@@ -104,11 +82,10 @@ app.post('/tasks', async (req, res) => {
     });
 
     const savedTask = await task.save();
-
     res.status(201).json(savedTask);
+
   } catch (err) {
     console.error('Create error:', err.message);
-
     res.status(400).json({
       message: 'Could not create task'
     });
@@ -136,9 +113,9 @@ app.patch('/tasks/:id', async (req, res) => {
     }
 
     res.json(updatedTask);
+
   } catch (err) {
     console.error('Update error:', err.message);
-
     res.status(400).json({
       message: 'Could not update task'
     });
@@ -161,17 +138,15 @@ app.delete('/tasks/:id', async (req, res) => {
     res.json({
       message: 'Task deleted successfully'
     });
+
   } catch (err) {
     console.error('Delete error:', err.message);
-
     res.status(400).json({
       message: 'Could not delete task'
     });
   }
 });
 
-// Connect to MongoDB and start server
-const PORT = process.env.PORT || 5000;
 // Connect to MongoDB and start server
 const PORT = process.env.PORT || 5000;
 
@@ -188,6 +163,7 @@ async function startServer() {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);
     });
+
   } catch (err) {
     console.error('Server startup failed:', err.message);
     process.exit(1);
